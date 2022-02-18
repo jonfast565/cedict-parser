@@ -1,0 +1,13 @@
+% Compile with xelatex
+% UTF-8 encoding
+\documentclass{article}
+\usepackage{xeCJK}
+\setCJKmainfont{SimSun}
+\begin{document}
+
+{% for word in lines %}
+    {{word.simplified}}
+    {{word.traditional}}
+{% endfor %}
+
+\end{document}

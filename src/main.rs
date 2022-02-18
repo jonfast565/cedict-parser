@@ -6,10 +6,12 @@ mod parser;
 mod utils;
 mod downloader;
 mod consts;
+mod templatebuilder;
 
 use crate::downloader::{CeDownloader};
 use crate::parser::{CeParser};
 use crate::utils::{CeOptions};
+use crate::templatebuilder::{TemplateBuilder};
 
 fn main() {
     let opts = CeOptions { base_path: String::from("./") };
@@ -19,6 +21,8 @@ fn main() {
     let lines = p.parse();
     let json = serde_json::to_string_pretty(&lines).unwrap();
     utils::write_file(&String::from("./data/output.json"), &json);
+    let latex_markup = TemplateBuilder::compile_latex(&lines);
+    utils::write_file(&String::from("./data/dict.latex"), &latex_markup);
 }
 
 #[cfg(test)]

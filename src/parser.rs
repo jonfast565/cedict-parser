@@ -13,10 +13,16 @@ lazy_static! {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct CeLine {
-    simplified: String,
-    traditional: String,
-    pinyin: Vec<String>,
-    definitions: Vec<String>,
+    pub simplified: String,
+    pub traditional: String,
+    pub pinyin: Vec<String>,
+    pub definitions: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CeResult {
+    pub lines: Vec<CeLine>
 }
 
 pub struct CeParser {
@@ -55,7 +61,7 @@ impl CeParser {
         }
     }
 
-    pub fn parse(&self) -> Vec<CeLine> {
+    pub fn parse(&self) -> CeResult {
         let mut results = Vec::<CeLine>::new();
         let data = fs::read_to_string(&self.dict_file_path).expect("Unable to read file");
         let lines = data.split("\r\n").collect::<Vec<&str>>();
@@ -71,7 +77,9 @@ impl CeParser {
                 println!("{}/{} lines read", counter, lines_length);
             }
         }
-        results
+        CeResult {
+            lines: results
+        }
     }
 
     fn parse_line(line: &str) -> Option<CeLine> {
