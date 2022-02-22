@@ -22,7 +22,7 @@ fn main() {
     let json = serde_json::to_string_pretty(&lines).unwrap();
     utils::write_file(&String::from("./data/output.json"), &json);
     let latex_markup = TemplateBuilder::compile_latex(&lines);
-    utils::write_file(&String::from("./data/dict.latex"), &latex_markup);
+    utils::write_file(&String::from("./data/dict.tex"), &latex_markup);
 }
 
 #[cfg(test)]
