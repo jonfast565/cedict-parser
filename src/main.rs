@@ -7,6 +7,7 @@ mod utils;
 mod downloader;
 mod consts;
 mod templatebuilder;
+mod database;
 
 use crate::downloader::{CeDownloader};
 use crate::parser::{CeParser};
@@ -23,6 +24,9 @@ fn main() {
     utils::write_file(&String::from("./data/output.json"), &json);
     let latex_markup = TemplateBuilder::compile_latex(&lines);
     utils::write_file(&String::from("./data/dict.tex"), &latex_markup);
+    let _ = database::init_db();
+    let lines_db = lines.lines.iter().collect();
+    database::insert_lines(lines_db);
 }
 
 #[cfg(test)]
