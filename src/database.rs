@@ -1,7 +1,6 @@
 extern crate rusqlite;
 
-use std::error::Error;
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, Result, backup};
 use crate::parser::CeLine;
 
 fn insert_into_db(line: &CeLine, conn: &Connection) -> Result<()> {
@@ -11,20 +10,24 @@ fn insert_into_db(line: &CeLine, conn: &Connection) -> Result<()> {
     )?;
 
     let ce_line_id = conn.last_insert_rowid();
+    let mut counter = 1;
     for py in &line.pinyin {
         let pinyin_id = insert_or_get_pinyin(conn, py)?;
         conn.execute(
-            "INSERT INTO ce_line_pinyin (ce_line_id, pinyin_id) VALUES (?1, ?2)",
-            params![ce_line_id, pinyin_id],
+            "INSERT INTO ce_line_pinyin (ordering, ce_line_id, pinyin_id) VALUES (?1, ?2, ?3)",
+            params![counter, ce_line_id, pinyin_id],
         )?;
+        counter += 1;
     }
 
+    counter = 1;
     for def in &line.definitions {
         let definition_id = insert_or_get_definition(conn, def)?;
         conn.execute(
-            "INSERT INTO ce_line_definitions (ce_line_id, definition_id) VALUES (?1, ?2)",
-            params![ce_line_id, definition_id],
+            "INSERT INTO ce_line_definitions (ordering, ce_line_id, definition_id) VALUES (?1, ?2, ?3)",
+            params![counter, ce_line_id, definition_id],
         )?;
+        counter += 1;
     }
 
     Ok(())
@@ -56,34 +59,31 @@ fn insert_or_get_definition(conn: &Connection, definition: &str) -> Result<i64> 
 
 static DATABASE_NAME: &str =  "data/cedb.sqlite";
 
-pub fn init_db() -> Result<(), rusqlite::Error> {
-    let conn = Connection::open(DATABASE_NAME)?;
+pub fn insert_lines(lines: Vec<&CeLine>) -> Result<(), rusqlite::Error> {
+    let conn = Connection::open_in_memory()?;
 
     create_line_table(&conn)?;
     create_pinyin_table(&conn)?;
     create_definitions_table(&conn)?;
+    create_line_characters(&conn)?;
     create_line_pinyin_table(&conn)?;
     create_line_definitions_table(&conn)?;
 
-    let close = conn.close();
-    if close.is_err() {
-        Err(close.err().unwrap().1)
-    } else {
-        Ok(())
-    }
-}
-
-pub fn insert_lines(lines: Vec<&CeLine>) -> Result<(), rusqlite::Error> {
-    let conn = Connection::open(DATABASE_NAME)?;
+    let len = lines.len();
+    let mut counter: usize = 0;
     for line in lines {
-        let _ = insert_into_db(line, &conn);
+        insert_into_db(line, &conn)?;
+        println!("{}/{} rows inserted in database, {:.2}% completed", counter, len, (counter as f32 / len as f32) * 100.0);
+        counter += 1;
     }
-    let close = conn.close();
-    if close.is_err() {
-        Err(close.err().unwrap().1)
-    } else {
-        Ok(())
-    }
+    //conn.execute("COMMIT", [])?;
+    conn.cache_flush()?;
+
+    let mut dst = Connection::open(DATABASE_NAME)?;
+    let backup = backup::Backup::new(&conn, &mut dst)?;
+    backup.run_to_completion(100, std::time::Duration::from_millis(25), None)?;
+
+    Ok(())
 }
 
 fn create_line_table(conn: &Connection) -> Result<(), rusqlite::Error> {
@@ -123,11 +123,12 @@ fn create_definitions_table(conn: &Connection) -> Result<(), rusqlite::Error> {
 fn create_line_pinyin_table(conn: &Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ce_line_pinyin (
+            ordering INTEGER NOT NULL,
             ce_line_id INTEGER NOT NULL,
             pinyin_id INTEGER NOT NULL,
             FOREIGN KEY (ce_line_id) REFERENCES ce_line(id),
             FOREIGN KEY (pinyin_id) REFERENCES pinyin(id),
-            PRIMARY KEY (ce_line_id, pinyin_id)
+            PRIMARY KEY (ordering, ce_line_id, pinyin_id)
         )",
         [],
     )?;
@@ -137,11 +138,12 @@ fn create_line_pinyin_table(conn: &Connection) -> Result<(), rusqlite::Error> {
 fn create_line_definitions_table(conn: &Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ce_line_definitions (
+            ordering INTEGER NOT NULL,
             ce_line_id INTEGER NOT NULL,
             definition_id INTEGER NOT NULL,
             FOREIGN KEY (ce_line_id) REFERENCES ce_line(id),
             FOREIGN KEY (definition_id) REFERENCES definitions(id),
-            PRIMARY KEY (ce_line_id, definition_id)
+            PRIMARY KEY (ordering, ce_line_id, definition_id)
         )",
         [],
     )?;
